@@ -1,6 +1,24 @@
 import requests
+import gspread
 
-# ЗАПРОС НА УСТАНОВКИ
+class rawDataExportRow:
+
+    def __init__(self, mediaSource, platform, partner, campaignName):
+
+        self.mediaSource = mediaSource
+        self.platform = platform
+        self.partner = partner
+        self.campaignName = campaignName
+
+    def __eq__(self, other):
+
+        return (isinstance(other, type(self))
+                and (self.mediaSource, self.platform, self.partner, self.campaignName) ==
+                    (other.mediaSource, other.platform, other.partner, self.campaignName))
+
+    def __hash__(self):
+        return hash((self.mediaSource, self.platform, self.partner, self.campaignName))
+
 def getDataFromAppsFlyer(appName, type):
 
     mediaSourceCountDict = {}
@@ -25,11 +43,25 @@ def getDataFromAppsFlyer(appName, type):
 
         # ищем колонку media source
         mediaSourceColumn = -1
+        paltformColumn = -1
+        partnerColumn = -1
+        campaignNameColumn = -1
+
         for line in resultArray:
             for i in range(len(line)):
+
                 if line[i] == "Media Source":
                     mediaSourceColumn = i
-                    break
+
+                elif line[i] == "Platform":
+                    paltformColumn = i
+
+                elif line[i] == "Partner":
+                    partnerColumn = i
+
+                elif line[i] == "Campaign":
+                    campaignNameColumn = i
+
             break
 
         # ищем все media source и считаем их количество
@@ -37,21 +69,25 @@ def getDataFromAppsFlyer(appName, type):
             index = 1
             while index < len(resultArray):
                 line = resultArray[index]
-                if mediaSourceColumn > len(line):
+                if mediaSourceColumn > len(line) or paltformColumn > len(line):
                     break
 
                 mediaSource = line[mediaSourceColumn]
+                paltform = line[paltformColumn]
+                partner = line[partnerColumn]
+                campaignName = line[campaignNameColumn]
 
-                if not mediaSource in mediaSourceCountDict:
-                    mediaSourceCountDict[mediaSource] = 1
+                item = rawDataExportRow(mediaSource, paltform, partner, campaignName)
+
+                if not item in mediaSourceCountDict:
+                    mediaSourceCountDict[item] = 1
                 else:
-                    mediaSourceCountDict[mediaSource] += 1
+                    mediaSourceCountDict[item] += 1
 
                 index += 1
 
-        mediaSourceCountDict = dict(sorted(mediaSourceCountDict.items()))
-
     return mediaSourceCountDict
+
 
 # список всех клиентов
 appNameList = ["robot.zaimer.ru"]
@@ -61,8 +97,30 @@ fraudDict = []
 
 for name in appNameList:
 
+    # подключаемся к таблице с клиентом с нужным месяцем
+    gc = gspread.service_account('C:\\FraudAlert\\fraudalert-4cdb5f092ad5.json')
+    document = gc.open_by_url("https://docs.google.com/spreadsheets/d/1gHW7mwoI7own9HauvpDGG1VscU8mz5_eWOwqBg11yXI/edit?gid=0#gid=0")
+    mainSheet = document.get_worksheet(0)
+
+    # очищаем предыдущие результаты
+    mainSheet.delete_rows(9, 999)
+    mainSheet.add_rows(999)
+
+    # собираем установки, ивенты и фрод
     installDict = getDataFromAppsFlyer(name, "installs_report")
-    fraudDict = getDataFromAppsFlyer(name, "blocked_installs_report")
+    fraudDict = getDataFromAppsFlyer(name, "detection")
+
+    # записываем результаты в таблицу
+    currentRow = 9
+    for item in installDict.keys():
+
+        mainSheet.update_cell(currentRow, 1, item.platform)
+        mainSheet.update_cell(currentRow, 2, item.partner)
+        mainSheet.update_cell(currentRow, 3, item.campaignName)
+        mainSheet.update_cell(currentRow, 4, item.mediaSource)
+        mainSheet.update_cell(currentRow, 8, str(installDict[item]))
+
+        currentRow += 1
 
 aaa = 5
 
