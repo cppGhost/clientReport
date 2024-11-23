@@ -1,5 +1,6 @@
 import requests
 import gspread
+import time
 
 class rawDataExportRow:
 
@@ -19,11 +20,17 @@ class rawDataExportRow:
     def __hash__(self):
         return hash((self.mediaSource, self.platform, self.partner, self.campaignName))
 
+def writeToGoogleSheet(sheet, row, column, value):
+
+    sheet.update_cell(row, column, value)
+    time.sleep(0.8)
+
 def getDataFromAppsFlyer(appName, type):
 
+    print("обработка " + type)
     mediaSourceCountDict = {}
 
-    url = "https://hq1.appsflyer.com/api/raw-data/export/app/" + appName + "/" + type + "/v5?from=2024-11-13&to=2024-11-19&maximum_rows=1000000"
+    url = "https://hq1.appsflyer.com/api/raw-data/export/app/" + appName + "/" + type + "/v5?from=2024-11-01&to=2024-11-22&maximum_rows=1000000"
     headers = {
         "accept": "text/csv",
         "authorization": "Bearer eyJhbGciOiJBMjU2S1ciLCJjdHkiOiJKV1QiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiSldUIiwiemlwIjoiREVGIn0.aikOWVa1dAjqKbwk-l_m07a7XclQRoG-rnrj3EhgOj7jmfz4QKLkgA.hWSGvVbjxELQJpcN.4qraCp6v3_XM9RcupS3rI1IJh0-PBs5wWJXfR2d6NqMhOiqyzGQ7LHinRUoacySti64_s5HSXpX_QRkNRUJHGL9ZupRMGhFJFmhJmpaWr8T5lBN6-oFmX9m4Xok8qTWRLIBGtHYtAgABk3MmMV7AAXWCbh_J-mOvJX48q6P1-STeMz_4GpbOVE47OM9KbBEIKu-BRV70Rqk5UorSJTHqecP3qE9Z6FNL97Zo5ASqmQsuTuC2D8TcEVugc0zXp5tuR40QskqiksexOt_Ul1au7cgPeGHCJJB-bwR2Wtekjm6KrtEIhJut76I3EZkq7LmRhCLO-0U7-uNN21oluvj1GC6q5wGxbZ1T98N9ZDA9A7hjXPTot2bYxyHOr8wfVJJb7hkbkVvZU7wR2T6VyuYNXm8KtVS_JYCDbAeiGuF6u5Z1aQx_c5HxcS59QCZH1CNhAd89Fk0_m-2M0kI50CLDICdGnYKlWDuCZhgl-YkbGAT-TchnKZWEwPjOjh5X0qkcFIeTdcXpw6e9Yw8PCYJHaE8.GJx9usdCVHAd4meyrYzBpg"
@@ -114,11 +121,37 @@ for name in appNameList:
     currentRow = 9
     for item in installDict.keys():
 
-        mainSheet.update_cell(currentRow, 1, item.platform)
-        mainSheet.update_cell(currentRow, 2, item.partner)
-        mainSheet.update_cell(currentRow, 3, item.campaignName)
-        mainSheet.update_cell(currentRow, 4, item.mediaSource)
-        mainSheet.update_cell(currentRow, 8, str(installDict[item]))
+        installValue = installDict[item]
+        fraudItem = rawDataExportRow(item.mediaSource, item.platform, item.partner, item.campaignName)
+
+        fraudValue = 0
+        if fraudItem in fraudDict:
+            fraudValue = fraudDict[fraudItem]
+
+        # формируем строку для google sheet
+        body = [item.platform,
+                item.partner,
+                item.campaignName,
+                item.mediaSource,
+                "",  # network
+                "",  # Affiliate manager
+                "",  # Status
+                str(installDict[item]),
+                fraudValue,
+                str(round(fraudValue / installValue * 100, 1)) + "%",
+                str(installValue - fraudValue)]
+
+        # range для строки
+        end_col = chr(ord('A') + len(body) - 1)
+        cell_range = f'A{currentRow}:{end_col}{currentRow}'
+        cell_list = mainSheet.range(cell_range)
+
+        for i, cell in enumerate(cell_list):
+            cell.value = body[i]
+
+        # обновляем сразу всю строку
+        mainSheet.update_cells(cell_list)
+        time.sleep(0.8)
 
         currentRow += 1
 
