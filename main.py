@@ -30,7 +30,7 @@ def getDataFromAppsFlyer(appName, type):
     print("обработка " + type)
     mediaSourceCountDict = {}
 
-    url = "https://hq1.appsflyer.com/api/raw-data/export/app/" + appName + "/" + type + "/v5?from=2024-11-01&to=2024-11-22&maximum_rows=1000000"
+    url = "https://hq1.appsflyer.com/api/raw-data/export/app/" + appName + "/" + type + "/v5?from=2024-11-01&to=2024-11-20&maximum_rows=1000000"
     headers = {
         "accept": "text/csv",
         "authorization": "Bearer eyJhbGciOiJBMjU2S1ciLCJjdHkiOiJKV1QiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiSldUIiwiemlwIjoiREVGIn0.aikOWVa1dAjqKbwk-l_m07a7XclQRoG-rnrj3EhgOj7jmfz4QKLkgA.hWSGvVbjxELQJpcN.4qraCp6v3_XM9RcupS3rI1IJh0-PBs5wWJXfR2d6NqMhOiqyzGQ7LHinRUoacySti64_s5HSXpX_QRkNRUJHGL9ZupRMGhFJFmhJmpaWr8T5lBN6-oFmX9m4Xok8qTWRLIBGtHYtAgABk3MmMV7AAXWCbh_J-mOvJX48q6P1-STeMz_4GpbOVE47OM9KbBEIKu-BRV70Rqk5UorSJTHqecP3qE9Z6FNL97Zo5ASqmQsuTuC2D8TcEVugc0zXp5tuR40QskqiksexOt_Ul1au7cgPeGHCJJB-bwR2Wtekjm6KrtEIhJut76I3EZkq7LmRhCLO-0U7-uNN21oluvj1GC6q5wGxbZ1T98N9ZDA9A7hjXPTot2bYxyHOr8wfVJJb7hkbkVvZU7wR2T6VyuYNXm8KtVS_JYCDbAeiGuF6u5Z1aQx_c5HxcS59QCZH1CNhAd89Fk0_m-2M0kI50CLDICdGnYKlWDuCZhgl-YkbGAT-TchnKZWEwPjOjh5X0qkcFIeTdcXpw6e9Yw8PCYJHaE8.GJx9usdCVHAd4meyrYzBpg"
@@ -41,7 +41,7 @@ def getDataFromAppsFlyer(appName, type):
 
         # из текста делаем двумерный массив
         strings = response.text.split('\n')
-        print(name + " установки всего строк: " + str(len(strings)))
+        print(appName + " установки всего строк: " + str(len(strings)))
 
         resultArray = []
         for buf in strings:
@@ -96,13 +96,13 @@ def getDataFromAppsFlyer(appName, type):
     return mediaSourceCountDict
 
 
-# список всех клиентов
-appNameList = ["robot.zaimer.ru"]
-
-installDict = []
-fraudDict = []
+# список всех клиентов (пара "андроид, ios")
+appNameList = [ ["robot.zaimer.ru", "id1388812308"] ]
 
 for name in appNameList:
+
+    installDict = {}
+    fraudDict = {}
 
     # подключаемся к таблице с клиентом с нужным месяцем
     gc = gspread.service_account('C:\\FraudAlert\\fraudalert-4cdb5f092ad5.json')
@@ -114,11 +114,25 @@ for name in appNameList:
     mainSheet.add_rows(999)
 
     # собираем установки, ивенты и фрод
-    installDict = getDataFromAppsFlyer(name, "installs_report")
-    fraudDict = getDataFromAppsFlyer(name, "detection")
+    writeToGoogleSheet(mainSheet, 1, 16, "Загрузка установок Android")
+    tempDict = getDataFromAppsFlyer(name[0], "installs_report")
+    installDict.update(tempDict)
+
+    writeToGoogleSheet(mainSheet, 1, 16, "Загрузка фрода Android")
+    tempDict = getDataFromAppsFlyer(name[0], "detection")
+    fraudDict.update(tempDict)
+
+    writeToGoogleSheet(mainSheet, 1, 16, "Загрузка установок IOS")
+    tempDict = getDataFromAppsFlyer(name[1], "installs_report")
+    installDict.update(tempDict)
+
+    writeToGoogleSheet(mainSheet, 1, 16, "Загрузка фрода IOS")
+    tempDict = getDataFromAppsFlyer(name[1], "detection")
+    fraudDict.update(tempDict)
 
     # записываем результаты в таблицу
     currentRow = 9
+    reportList = []
     for item in installDict.keys():
 
         installValue = installDict[item]
@@ -141,6 +155,8 @@ for name in appNameList:
                 str(round(fraudValue / installValue * 100, 1)) + "%",
                 str(installValue - fraudValue)]
 
+        reportList.append(body)
+        
         # range для строки
         end_col = chr(ord('A') + len(body) - 1)
         cell_range = f'A{currentRow}:{end_col}{currentRow}'
@@ -150,10 +166,12 @@ for name in appNameList:
             cell.value = body[i]
 
         # обновляем сразу всю строку
-        mainSheet.update_cells(cell_list)
-        time.sleep(0.8)
+        #mainSheet.update_cells(cell_list)
+        #time.sleep(0.8)
 
         currentRow += 1
+    
+    
 
 aaa = 5
 
