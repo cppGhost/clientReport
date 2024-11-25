@@ -131,8 +131,9 @@ for name in appNameList:
     fraudDict.update(tempDict)
 
     # записываем результаты в таблицу
-    currentRow = 9
     reportList = []
+    writeToGoogleSheet(mainSheet, 1, 16, "Вывод результатов")
+
     for item in installDict.keys():
 
         installValue = installDict[item]
@@ -156,22 +157,21 @@ for name in appNameList:
                 str(installValue - fraudValue)]
 
         reportList.append(body)
-        
+
+    if len(reportList) > 0:
+
+        bodyMaxLen = len(reportList[0])
+
         # range для строки
-        end_col = chr(ord('A') + len(body) - 1)
-        cell_range = f'A{currentRow}:{end_col}{currentRow}'
+        end_col = chr(ord('A') + bodyMaxLen - 1)
+        cell_range = f'A{9}:{end_col}{9+len(reportList)-1}'
         cell_list = mainSheet.range(cell_range)
 
         for i, cell in enumerate(cell_list):
-            cell.value = body[i]
+            cell.value = reportList[int(i / bodyMaxLen)][i % bodyMaxLen]
 
         # обновляем сразу всю строку
-        #mainSheet.update_cells(cell_list)
-        #time.sleep(0.8)
+        mainSheet.update_cells(cell_list)
 
-        currentRow += 1
-    
-    
-
-aaa = 5
+    writeToGoogleSheet(mainSheet, 1, 16, "ГОТОВО")
 
